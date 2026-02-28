@@ -1,14 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/miekg/dns"
 	"github.com/oschwald/geoip2-golang"
@@ -35,6 +38,7 @@ type dnsRouter struct {
 	cidrRules           []cidrRule
 	edgesByName         map[string]edgeServer
 	geoDB               *geoip2.Reader
+	httpClient          *http.Client
 }
 
 func main() {
@@ -166,6 +170,18 @@ func (r *dnsRouter) pickEdgeIP(clientAddr netip.Addr) (net.IP, bool) {
 		}
 	}
 
+	// Fallback: no local GeoIP DB or no hit. Query external geolocation API.
+	if clientAddr.IsValid() {
+		clientIP := net.ParseIP(clientAddr.String())
+		if clientIP != nil {
+			if lat, lon, ok := lookupGeoCoordsHTTP(clientIP, r.httpClient); ok {
+				if edgeIP, ok := nearestEdgeIP(lat, lon, r.edgesByName); ok {
+					return edgeIP, true
+				}
+			}
+		}
+	}
+
 	if edge, ok := r.edgesByName[r.defaultEdge]; ok {
 		return edge.ip, true
 	}
@@ -265,6 +281,9 @@ func loadRouterFromEnv() (*dnsRouter, error) {
 		cidrRules:           rules,
 		edgesByName:         edgesByName,
 		geoDB:               geoDB,
+		httpClient: &http.Client{
+			Timeout: 2 * time.Second,
+		},
 	}, nil
 }
 
@@ -326,6 +345,40 @@ func lookupGeoCoords(ip net.IP, reader *geoip2.Reader) (float64, float64, bool) 
 		return 0, 0, false
 	}
 	return record.Location.Latitude, record.Location.Longitude, true
+}
+
+func lookupGeoCoordsHTTP(ip net.IP, client *http.Client) (float64, float64, bool) {
+	// No-op for private/loopback addresses.
+	if ip.IsLoopback() || ip.IsPrivate() {
+		return 0, 0, false
+	}
+
+	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=status,lat,lon", ip.String())
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, 0, false
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, 0, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, false
+	}
+
+	var payload struct {
+		Status string  `json:"status"`
+		Lat    float64 `json:"lat"`
+		Lon    float64 `json:"lon"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0, 0, false
+	}
+	if strings.ToLower(payload.Status) != "success" {
+		return 0, 0, false
+	}
+	return payload.Lat, payload.Lon, true
 }
 
 func haversineKM(lat1, lon1, lat2, lon2 float64) float64 {
