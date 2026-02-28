@@ -1,0 +1,87 @@
+services:
+  origin:
+    build:
+      context: ./origin
+      dockerfile: Dockerfile
+    container_name: gocdn-origin
+    environment:
+      - TZ=UTC
+    ports:
+      - "8081:8081"
+    networks:
+      cdnnet:
+        ipv4_address: 172.28.0.10
+
+  shield:
+    build:
+      context: ./cdn
+      dockerfile: Dockerfile
+    container_name: gocdn-shield
+    environment:
+      - EDGE_LISTEN_ADDR=:8080
+      - ORIGIN_URL=http://origin:8081
+      - EDGE_MAX_MEMORY_BYTES=134217728
+      - EDGE_EVICTION_POLICY=lru
+      - EDGE_DISK_CACHE_DIR=/cache
+      - EDGE_DISK_CACHE_MAX_BYTES=2147483648
+      - UPSTREAM_TIMEOUT_SEC=10
+    volumes:
+      - shield_cache:/cache
+    depends_on:
+      - origin
+    networks:
+      cdnnet:
+        ipv4_address: 172.28.0.15
+
+  edge:
+    build:
+      context: ./cdn
+      dockerfile: Dockerfile
+    container_name: gocdn-edge
+    environment:
+      - EDGE_LISTEN_ADDR=:8080
+      - SHIELD_URL=http://shield:8080
+      - EDGE_MAX_MEMORY_BYTES=268435456
+      - EDGE_EVICTION_POLICY=lru
+      - EDGE_DISK_CACHE_DIR=/cache
+      - EDGE_DISK_CACHE_MAX_BYTES=4294967296
+      - UPSTREAM_TIMEOUT_SEC=10
+    volumes:
+      - edge_cache:/cache
+    ports:
+      - "8080:8080"
+    depends_on:
+      - shield
+    networks:
+      cdnnet:
+        ipv4_address: 172.28.0.20
+
+  dns:
+    build:
+      context: ./dns
+      dockerfile: Dockerfile
+    container_name: gocdn-dns
+    environment:
+      - DNS_LISTEN_ADDR=:5353
+      - DNS_DOMAIN=cdn.local.
+      - DNS_DEFAULT_POOL=default
+      - DNS_POOL_DEFAULT=172.28.0.20:100
+      - DNS_GEO_RULES=10.0.0.0/8=default,192.168.0.0/16=default
+    ports:
+      - "5353:5353/udp"
+    depends_on:
+      - edge
+    networks:
+      cdnnet:
+        ipv4_address: 172.28.0.53
+
+volumes:
+  edge_cache:
+  shield_cache:
+
+networks:
+  cdnnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

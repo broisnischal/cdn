@@ -1,0 +1,8 @@
+.git
+.gitignore
+.cursor
+**/.DS_Store
+**/bin
+**/tmp
+**/.env
+terraform/.terraform

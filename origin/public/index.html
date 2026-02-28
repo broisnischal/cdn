@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Go CDN Origin Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: #0b1220;
+        color: #e9eefc;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 1rem 4rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+      }
+      p {
+        color: #b6c2e2;
+      }
+      img {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        border: 1px solid #24304f;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      }
+      code {
+        background: #16213d;
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Origin Demo: High Resolution Asset</h1>
+      <p>
+        This page is served by the origin. Edge should cache this HTML and the high-resolution image below.
+      </p>
+      <p>
+        Image URL: <code>/images/hero-4k.svg</code>
+      </p>
+      <img src="/images/hero-4k.svg" alt="4K demo artwork from origin" />
+    </main>
+  </body>
+</html>
