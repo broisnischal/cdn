@@ -21,3 +21,7 @@ coverage.out
 
 # Docker leftovers
 *.tar
+
+# Terraform variable files with secrets
+terraform/envs/prod.tfvars
+terraform/envs/*.secrets.tfvars
