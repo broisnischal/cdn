@@ -1,17 +1,18 @@
 project_name        = "gocdn-dev"
-authoritative_domain = "cdn-dev.example.com."
-edge_instance_type  = "t3.small"
-origin_instance_type = "t3.small"
-dns_instance_type    = "t3.small"
+authoritative_domain = "jotko.site."
+edge_instance_type  = "t2.micro"
+origin_instance_type = "t2.micro"
+dns_instance_type    = "t2.micro"
 default_edge         = "us"
+ns_hosts             = ["ns1"]
 
 # Restrict SSH if needed; keep empty for SSM-only.
 ssh_allowed_cidrs = []
 
 # Replace with your pushed images (ECR/GHCR/Docker Hub).
-edge_image   = "ghcr.io/example/go-cdn:latest"
-origin_image = "ghcr.io/example/go-cdn-origin:latest"
-dns_image    = "ghcr.io/example/go-cdn-dns:latest"
+edge_image   = "ghcr.io/broisnischal/go-cdn:latest"
+origin_image = "ghcr.io/broisnischal/go-cdn-origin:latest"
+dns_image    = "ghcr.io/broisnischal/go-cdn-dns:latest"
 
 geo_cidr_rules = [
   "49.36.0.0/14=in",

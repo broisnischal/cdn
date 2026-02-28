@@ -113,9 +113,13 @@ resource "aws_instance" "dns" {
     dnf -y install docker
     systemctl enable docker
     systemctl start docker
+    TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+    PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
     docker run -d --name authoritative-dns --restart unless-stopped \
       --network host \
       -e DNS_LISTEN_ADDR=:53 \
+      -e DNS_SELF_IP=$PUBLIC_IP \
+      -e DNS_NS_HOSTS='${join(",", var.ns_hosts)}' \
       -e DNS_AUTHORITATIVE_DOMAIN=${var.authoritative_domain} \
       -e DNS_ORIGIN_IP=${var.origin_ip} \
       -e DNS_DEFAULT_EDGE=${var.default_edge} \

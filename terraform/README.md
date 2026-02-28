@@ -14,6 +14,8 @@ DNS routing logic is inside your DNS service:
 - CIDR match (`DNS_GEO_CIDR_RULES`) first
 - then GeoIP lookup + Haversine nearest-edge
 - fallback to `DNS_DEFAULT_EDGE`
+- serves authoritative `NS` responses for apex (for example `jotko.site -> ns1.jotko.site`)
+- serves `A` for `ns1.<domain>` using the DNS server public IP
 
 ## Folder Layout
 
@@ -24,8 +26,8 @@ terraform/
   variables.tf
   outputs.tf
   modules/
-    edge-node/
-    origin-node/
+    edge/
+    origin/
     dns/
   envs/
     dev.tfvars
@@ -67,4 +69,9 @@ terraform destroy -var-file=envs/dev.tfvars
 - IMDSv2 is enforced on instances.
 - Root volumes are encrypted.
 - Prefer immutable image tags in production.
-- To make this truly authoritative globally, register your DNS node(s) as NS at your registrar and configure glue records (`ns1/ns2`).
+- DNS binds to port `53` (UDP/TCP) in EC2 via host network.
+- Local development may require sudo for port 53; otherwise run on `:5353`.
+- Register at your registrar after first deploy:
+  - `ns1.jotko.site A <dns_public_ip>`
+  - `jotko.site NS ns1.jotko.site`
+  - add glue host `ns1.jotko.site -> <dns_public_ip>`

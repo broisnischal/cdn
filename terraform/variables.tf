@@ -7,7 +7,7 @@ variable "project_name" {
 variable "authoritative_domain" {
   description = "Domain served by your authoritative DNS server, e.g. cdn.example.com."
   type        = string
-  default     = "cdn.local."
+  default     = "jotko.site."
 }
 
 variable "ssh_allowed_cidrs" {
@@ -19,19 +19,19 @@ variable "ssh_allowed_cidrs" {
 variable "edge_instance_type" {
   description = "EC2 instance type for edge nodes."
   type        = string
-  default     = "t3.small"
+  default     = "t2.micro"
 }
 
 variable "origin_instance_type" {
   description = "EC2 instance type for origin node."
   type        = string
-  default     = "t3.small"
+  default     = "t2.micro"
 }
 
 variable "dns_instance_type" {
   description = "EC2 instance type for authoritative DNS node."
   type        = string
-  default     = "t3.small"
+  default     = "t2.micro"
 }
 
 variable "edge_ami_owner" {
@@ -43,19 +43,19 @@ variable "edge_ami_owner" {
 variable "edge_image" {
   description = "Container image to run on edge EC2 instances."
   type        = string
-  default     = "ghcr.io/example/go-cdn:latest"
+  default     = "ghcr.io/broisnischal/go-cdn:latest"
 }
 
 variable "origin_image" {
   description = "Container image to run on origin EC2 instance."
   type        = string
-  default     = "ghcr.io/example/go-cdn-origin:latest"
+  default     = "ghcr.io/broisnischal/go-cdn-origin:latest"
 }
 
 variable "dns_image" {
   description = "Container image to run on DNS EC2 instance."
   type        = string
-  default     = "ghcr.io/example/go-cdn-dns:latest"
+  default     = "ghcr.io/broisnischal/go-cdn-dns:latest"
 }
 
 variable "default_edge" {
@@ -89,4 +89,10 @@ variable "geo_cidr_rules" {
     "49.36.0.0/14=in",
     "8.8.8.0/24=us"
   ]
+}
+
+variable "ns_hosts" {
+  description = "Authoritative NS host labels served under authoritative_domain."
+  type        = list(string)
+  default     = ["ns1"]
 }

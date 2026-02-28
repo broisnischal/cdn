@@ -57,3 +57,7 @@ variable "edge_eu_coords" {
 variable "geo_cidr_rules" {
   type = list(string)
 }
+
+variable "ns_hosts" {
+  type = list(string)
+}
