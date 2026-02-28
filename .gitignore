@@ -1,0 +1,23 @@
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+
+# Env files (keep template)
+.env
+!.env.example
+
+# Logs and temp files
+*.log
+tmp/
+*.tmp
+
+# Go build artifacts
+bin/
+dist/
+coverage.out
+*.test
+
+# Docker leftovers
+*.tar
