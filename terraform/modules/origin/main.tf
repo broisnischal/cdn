@@ -19,21 +19,14 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_security_group" "dns" {
-  name        = "${var.project_name}-dns"
-  description = "Authoritative DNS SG"
+resource "aws_security_group" "origin" {
+  name        = "${var.project_name}-origin-${var.region_label}"
+  description = "Origin node SG"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 53
-    to_port     = 53
+    from_port   = 8081
+    to_port     = 8081
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -57,7 +50,7 @@ resource "aws_security_group" "dns" {
 }
 
 resource "aws_iam_role" "ssm_role" {
-  name = "${var.project_name}-dns-ssm"
+  name = "${var.project_name}-origin-ssm-${var.region_label}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -77,23 +70,15 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 }
 
 resource "aws_iam_instance_profile" "profile" {
-  name = "${var.project_name}-dns-profile"
+  name = "${var.project_name}-origin-profile-${var.region_label}"
   role = aws_iam_role.ssm_role.name
 }
 
-locals {
-  edge_servers = join(",", [
-    "us|${var.edge_us_ip}|${var.edge_us_coords.lat}|${var.edge_us_coords.lon}",
-    "in|${var.edge_in_ip}|${var.edge_in_coords.lat}|${var.edge_in_coords.lon}",
-    "eu|${var.edge_eu_ip}|${var.edge_eu_coords.lat}|${var.edge_eu_coords.lon}"
-  ])
-}
-
-resource "aws_instance" "dns" {
+resource "aws_instance" "origin" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
   subnet_id              = data.aws_subnets.default.ids[0]
-  vpc_security_group_ids = [aws_security_group.dns.id]
+  vpc_security_group_ids = [aws_security_group.origin.id]
   iam_instance_profile   = aws_iam_instance_profile.profile.name
 
   metadata_options {
@@ -101,7 +86,7 @@ resource "aws_instance" "dns" {
   }
 
   root_block_device {
-    encrypted   = true
+    encrypted = true
     volume_size = 20
     volume_type = "gp3"
   }
@@ -113,28 +98,23 @@ resource "aws_instance" "dns" {
     dnf -y install docker
     systemctl enable docker
     systemctl start docker
-    docker run -d --name authoritative-dns --restart unless-stopped \
-      --network host \
-      -e DNS_LISTEN_ADDR=:53 \
-      -e DNS_AUTHORITATIVE_DOMAIN=${var.authoritative_domain} \
-      -e DNS_ORIGIN_IP=${var.origin_ip} \
-      -e DNS_DEFAULT_EDGE=${var.default_edge} \
-      -e DNS_EDGE_SERVERS='${local.edge_servers}' \
-      -e DNS_GEO_CIDR_RULES='${join(",", var.geo_cidr_rules)}' \
+    docker run -d --name origin --restart unless-stopped \
+      -p 8081:8081 \
       ${var.container_image}
   EOF
 
   tags = {
-    Name = "${var.project_name}-dns-authoritative"
-    Role = "dns"
+    Name      = "${var.project_name}-origin-${var.region_label}"
+    Role      = "origin"
+    RegionTag = var.region_label
   }
 }
 
-resource "aws_eip" "dns" {
+resource "aws_eip" "origin" {
   domain   = "vpc"
-  instance = aws_instance.dns.id
+  instance = aws_instance.origin.id
 
   tags = {
-    Name = "${var.project_name}-dns-eip"
+    Name = "${var.project_name}-origin-eip-${var.region_label}"
   }
 }

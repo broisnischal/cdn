@@ -1,4 +1,4 @@
-# Terraform Deployment (AWS Multi-Region)
+# Terraform Deployment (AWS Multi-Region, Own Authoritative DNS)
 
 This setup creates:
 
@@ -7,16 +7,13 @@ This setup creates:
   - `us-east-1`
   - `ap-south-1` (India)
   - `eu-central-1`
-- Route53 geo-DNS records for `cdn.<domain>`:
-  - country `US` -> US edge
-  - country `IN` -> India edge
-  - continent `EU` -> EU edge
-  - default -> US edge
+- 1 authoritative DNS EC2 in `us-east-1` running your DNS service on `:53` UDP/TCP
 
-## DNS Hosting Answer
+DNS routing logic is inside your DNS service:
 
-You do **not** need to run a separate DNS server instance when using Route53.
-Route53 is a managed DNS service. You only host app/origin/edge instances.
+- CIDR match (`DNS_GEO_CIDR_RULES`) first
+- then GeoIP lookup + Haversine nearest-edge
+- fallback to `DNS_DEFAULT_EDGE`
 
 ## Folder Layout
 
@@ -39,8 +36,8 @@ terraform/
 
 - Terraform >= 1.6
 - AWS credentials configured (`aws configure`, env vars, or SSO)
-- Existing public Route53 hosted zone (e.g. `example.com.`)
 - CDN/origin container images published to ECR/GHCR/Docker Hub
+- DNS image published to ECR/GHCR/Docker Hub
 
 ## Deploy (dev)
 
@@ -70,3 +67,4 @@ terraform destroy -var-file=envs/dev.tfvars
 - IMDSv2 is enforced on instances.
 - Root volumes are encrypted.
 - Prefer immutable image tags in production.
+- To make this truly authoritative globally, register your DNS node(s) as NS at your registrar and configure glue records (`ns1/ns2`).

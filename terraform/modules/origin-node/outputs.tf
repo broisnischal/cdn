@@ -1,7 +1,7 @@
 output "public_ip" {
-  value = aws_eip.origin.public_ip
+  value = module.impl.public_ip
 }
 
 output "instance_id" {
-  value = aws_instance.origin.id
+  value = module.impl.instance_id
 }

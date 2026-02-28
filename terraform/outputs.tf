@@ -14,10 +14,10 @@ output "origin_public_ip" {
   value = module.origin_us.public_ip
 }
 
-output "cdn_fqdn" {
-  value = module.dns.cdn_record_name
+output "dns_public_ip" {
+  value = module.dns.public_ip
 }
 
-output "origin_fqdn" {
-  value = module.dns.origin_record_name
+output "authoritative_domain" {
+  value = var.authoritative_domain
 }

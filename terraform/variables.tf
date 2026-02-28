@@ -4,21 +4,10 @@ variable "project_name" {
   default     = "gocdn"
 }
 
-variable "domain_name" {
-  description = "Route53 hosted zone domain (must already exist), e.g. example.com."
+variable "authoritative_domain" {
+  description = "Domain served by your authoritative DNS server, e.g. cdn.example.com."
   type        = string
-}
-
-variable "cdn_record_name" {
-  description = "Record name inside hosted zone used for CDN entrypoint."
-  type        = string
-  default     = "cdn"
-}
-
-variable "origin_record_name" {
-  description = "Record name inside hosted zone used for origin host."
-  type        = string
-  default     = "origin"
+  default     = "cdn.local."
 }
 
 variable "ssh_allowed_cidrs" {
@@ -39,6 +28,12 @@ variable "origin_instance_type" {
   default     = "t3.small"
 }
 
+variable "dns_instance_type" {
+  description = "EC2 instance type for authoritative DNS node."
+  type        = string
+  default     = "t3.small"
+}
+
 variable "edge_ami_owner" {
   description = "AMI owner for Amazon Linux."
   type        = string
@@ -55,4 +50,43 @@ variable "origin_image" {
   description = "Container image to run on origin EC2 instance."
   type        = string
   default     = "ghcr.io/example/go-cdn-origin:latest"
+}
+
+variable "dns_image" {
+  description = "Container image to run on DNS EC2 instance."
+  type        = string
+  default     = "ghcr.io/example/go-cdn-dns:latest"
+}
+
+variable "default_edge" {
+  description = "Default edge name when no CIDR/GeoIP match is found."
+  type        = string
+  default     = "us"
+}
+
+variable "edge_us_coords" {
+  description = "Latitude/longitude for US edge."
+  type        = object({ lat = number, lon = number })
+  default     = { lat = 37.7749, lon = -122.4194 }
+}
+
+variable "edge_in_coords" {
+  description = "Latitude/longitude for India edge."
+  type        = object({ lat = number, lon = number })
+  default     = { lat = 19.0760, lon = 72.8777 }
+}
+
+variable "edge_eu_coords" {
+  description = "Latitude/longitude for EU edge."
+  type        = object({ lat = number, lon = number })
+  default     = { lat = 50.1109, lon = 8.6821 }
+}
+
+variable "geo_cidr_rules" {
+  description = "CIDR to edge routing rules in format CIDR=edge, e.g. 49.36.0.0/14=in."
+  type        = list(string)
+  default     = [
+    "49.36.0.0/14=in",
+    "8.8.8.0/24=us"
+  ]
 }
