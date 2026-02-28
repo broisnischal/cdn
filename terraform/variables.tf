@@ -19,19 +19,19 @@ variable "ssh_allowed_cidrs" {
 variable "edge_instance_type" {
   description = "EC2 instance type for edge nodes."
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "origin_instance_type" {
   description = "EC2 instance type for origin node."
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "dns_instance_type" {
   description = "EC2 instance type for authoritative DNS node."
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "edge_ami_owner" {

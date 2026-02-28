@@ -29,6 +29,8 @@ type edgeServer struct {
 type dnsRouter struct {
 	authoritativeDomain string
 	originIP            net.IP
+	selfIP              net.IP
+	nsHosts             []string
 	defaultEdge         string
 	cidrRules           []cidrRule
 	edgesByName         map[string]edgeServer
@@ -74,9 +76,44 @@ func (r *dnsRouter) handleQuery(w dns.ResponseWriter, req *dns.Msg) {
 			msg.Rcode = dns.RcodeRefused
 			continue
 		}
+		handled := false
+
+		if q.Qtype == dns.TypeNS || q.Qtype == dns.TypeANY {
+			if domainName == r.authoritativeDomain {
+				for _, host := range r.nsHosts {
+					nsFQDN := host + "." + r.authoritativeDomain
+					msg.Answer = append(msg.Answer, &dns.NS{
+						Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: 300},
+						Ns:  nsFQDN,
+					})
+				}
+				handled = true
+			}
+			if q.Qtype == dns.TypeNS {
+				continue
+			}
+		}
 
 		if q.Qtype != dns.TypeA && q.Qtype != dns.TypeANY {
 			continue
+		}
+
+		if r.selfIP != nil {
+			for _, host := range r.nsHosts {
+				nsFQDN := host + "." + r.authoritativeDomain
+				if domainName == nsFQDN {
+					rr := &dns.A{
+						Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 300},
+						A:   r.selfIP,
+					}
+					msg.Answer = append(msg.Answer, rr)
+					handled = true
+					break
+				}
+			}
+			if handled {
+				continue
+			}
 		}
 
 		if domainName == "origin."+r.authoritativeDomain {
@@ -85,6 +122,9 @@ func (r *dnsRouter) handleQuery(w dns.ResponseWriter, req *dns.Msg) {
 				A:   r.originIP,
 			}
 			msg.Answer = append(msg.Answer, rr)
+			handled = true
+		}
+		if handled {
 			continue
 		}
 
@@ -164,6 +204,12 @@ func loadRouterFromEnv() (*dnsRouter, error) {
 	if originIP == nil {
 		return nil, fmt.Errorf("DNS_ORIGIN_IP is required and must be valid")
 	}
+	selfIP := net.ParseIP(strings.TrimSpace(os.Getenv("DNS_SELF_IP")))
+
+	nsHosts := parseNSHosts(getEnv("DNS_NS_HOSTS", "ns1"))
+	if len(nsHosts) == 0 {
+		nsHosts = []string{"ns1"}
+	}
 
 	edgesByName, err := parseEdgeServers(getEnv("DNS_EDGE_SERVERS", "us|127.0.0.1|37.7749|-122.4194"))
 	if err != nil {
@@ -213,6 +259,8 @@ func loadRouterFromEnv() (*dnsRouter, error) {
 	return &dnsRouter{
 		authoritativeDomain: authoritative,
 		originIP:            originIP,
+		selfIP:              selfIP,
+		nsHosts:             nsHosts,
 		defaultEdge:         defaultEdge,
 		cidrRules:           rules,
 		edgesByName:         edgesByName,
@@ -297,6 +345,18 @@ func toRadians(v float64) float64 {
 
 func parseFloat(v string) (float64, error) {
 	return strconv.ParseFloat(v, 64)
+}
+
+func parseNSHosts(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		host := strings.ToLower(strings.TrimSpace(part))
+		host = strings.Trim(host, ".")
+		if host != "" {
+			out = append(out, host)
+		}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {

@@ -1,8 +1,8 @@
 project_name        = "gocdn-dev"
 authoritative_domain = "jotko.site."
-edge_instance_type  = "t2.micro"
-origin_instance_type = "t2.micro"
-dns_instance_type    = "t2.micro"
+edge_instance_type  = "t3.micro"
+origin_instance_type = "t3.micro"
+dns_instance_type    = "t3.micro"
 default_edge         = "us"
 ns_hosts             = ["ns1"]
 
