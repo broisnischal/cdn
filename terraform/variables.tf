@@ -58,6 +58,31 @@ variable "dns_image" {
   default     = "ghcr.io/broisnischal/go-cdn-dns:latest"
 }
 
+variable "dns_geoip_db_url" {
+  description = "Optional direct GeoLite DB URL (.tar.gz or .mmdb). If account/license are set, module uses MaxMind permalink with Basic Auth."
+  type        = string
+  default     = ""
+}
+
+variable "dns_geoip_account_id" {
+  description = "MaxMind account ID used for Basic Auth direct downloads."
+  type        = string
+  default     = ""
+}
+
+variable "dns_geoip_license_key" {
+  description = "MaxMind license key used for Basic Auth direct downloads."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "dns_geoip_edition_id" {
+  description = "MaxMind binary database edition ID (for example, GeoLite2-City)."
+  type        = string
+  default     = "GeoLite2-City"
+}
+
 variable "default_edge" {
   description = "Default edge name when no CIDR/GeoIP match is found."
   type        = string
@@ -85,7 +110,7 @@ variable "edge_eu_coords" {
 variable "geo_cidr_rules" {
   description = "CIDR to edge routing rules in format CIDR=edge, e.g. 49.36.0.0/14=in."
   type        = list(string)
-  default     = [
+  default = [
     "49.36.0.0/14=in",
     "8.8.8.0/24=us"
   ]

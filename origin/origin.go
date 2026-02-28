@@ -4,12 +4,38 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 )
 
+func resolvePublicDir() (string, error) {
+	candidates := []string{
+		filepath.Join(".", "public"),
+		filepath.Join(".", "origin", "public"),
+	}
+
+	// Also support running the built binary directly from a different cwd.
+	if exePath, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exePath), "public"))
+	}
+
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("public directory not found in known locations")
+}
+
 func main() {
-	publicDir := filepath.Join(".", "public")
+	publicDir, err := resolvePublicDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Origin static directory: %s", publicDir)
+
 	staticFS := http.FileServer(http.Dir(publicDir))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

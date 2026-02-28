@@ -13,6 +13,14 @@ ssh_allowed_cidrs = []
 edge_image   = "ghcr.io/broisnischal/go-cdn:latest"
 origin_image = "ghcr.io/broisnischal/go-cdn-origin:latest"
 dns_image    = "ghcr.io/broisnischal/go-cdn-dns:latest"
+# Preferred MaxMind auth settings (per docs):
+# download URL: https://download.maxmind.com/geoip/databases/<edition>/download?suffix=tar.gz
+# auth: Basic Auth with account_id:license_key
+dns_geoip_account_id  = ""
+dns_geoip_license_key = ""
+dns_geoip_edition_id  = "GeoLite2-City"
+# Optional fallback direct URL if you do not use account_id/license_key above.
+dns_geoip_db_url = ""
 
 geo_cidr_rules = [
   "49.36.0.0/14=in",

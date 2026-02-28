@@ -68,6 +68,10 @@ module "dns" {
   ssh_allowed_cidrs    = var.ssh_allowed_cidrs
   ami_owner            = var.edge_ami_owner
   container_image      = var.dns_image
+  geoip_db_url         = var.dns_geoip_db_url
+  geoip_account_id     = var.dns_geoip_account_id
+  geoip_license_key    = var.dns_geoip_license_key
+  geoip_edition_id     = var.dns_geoip_edition_id
   authoritative_domain = var.authoritative_domain
   default_edge         = var.default_edge
   origin_ip            = module.origin_us.public_ip

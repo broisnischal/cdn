@@ -18,6 +18,23 @@ variable "container_image" {
   type = string
 }
 
+variable "geoip_db_url" {
+  type = string
+}
+
+variable "geoip_account_id" {
+  type = string
+}
+
+variable "geoip_license_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "geoip_edition_id" {
+  type = string
+}
+
 variable "authoritative_domain" {
   type = string
 }

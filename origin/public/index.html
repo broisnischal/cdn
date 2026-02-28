@@ -25,6 +25,61 @@
       p {
         color: #b6c2e2;
       }
+      .controls {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin: 1rem 0;
+      }
+      button {
+        border: 1px solid #314372;
+        background: #16213d;
+        color: #e9eefc;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover {
+        background: #1d2c4f;
+      }
+      button:disabled {
+        opacity: 0.7;
+        cursor: wait;
+      }
+      .panel {
+        margin: 1rem 0 1.5rem;
+        background: #0f1931;
+        border: 1px solid #24304f;
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 0.75rem;
+      }
+      .metric {
+        background: #131f3b;
+        border: 1px solid #24304f;
+        border-radius: 10px;
+        padding: 0.7rem 0.8rem;
+      }
+      .metric .label {
+        display: block;
+        color: #9cb0de;
+        font-size: 0.82rem;
+      }
+      .metric .value {
+        display: block;
+        font-weight: 700;
+        margin-top: 0.2rem;
+        word-break: break-word;
+      }
+      .muted {
+        color: #9cb0de;
+        margin-top: 0.5rem;
+      }
       img {
         width: 100%;
         height: auto;
@@ -46,9 +101,102 @@
         This page is served by the origin. Edge should cache this HTML and the high-resolution image below.
       </p>
       <p>
-        Image URL: <code>/images/hero-4k.svg</code>
+        Image URL: <code>/images/earth.jpg</code>
       </p>
-      <img src="/images/hero-4k.svg" alt="4K demo artwork from origin" />
+
+      <section class="panel">
+        <div class="controls">
+          <button id="fetchBtn" type="button">Fetch</button>
+          <button id="refetchBtn" type="button">Refetch (force new URL)</button>
+        </div>
+        <div class="grid" id="metrics">
+          <div class="metric"><span class="label">Cache Status</span><span class="value" id="cacheStatus">-</span></div>
+          <div class="metric"><span class="label">HTTP Status</span><span class="value" id="httpStatus">-</span></div>
+          <div class="metric"><span class="label">Response Time</span><span class="value" id="responseTime">-</span></div>
+          <div class="metric"><span class="label">Client RTT (estimate)</span><span class="value" id="rtt">-</span></div>
+          <div class="metric"><span class="label">Server-Timing / Edge Latency</span><span class="value" id="edgeLatency">-</span></div>
+          <div class="metric"><span class="label">Edge</span><span class="value" id="edgeName">-</span></div>
+          <div class="metric"><span class="label">Age</span><span class="value" id="age">-</span></div>
+          <div class="metric"><span class="label">Content Length</span><span class="value" id="contentLength">-</span></div>
+        </div>
+        <p class="muted" id="lastRequest">No request yet.</p>
+      </section>
+
+      <img id="heroImage" src="/images/earth.jpg" alt="4K demo artwork from origin" />
     </main>
+
+    <script>
+      const IMAGE_PATH = "/images/earth.jpg";
+
+      const ui = {
+        fetchBtn: document.getElementById("fetchBtn"),
+        refetchBtn: document.getElementById("refetchBtn"),
+        heroImage: document.getElementById("heroImage"),
+        cacheStatus: document.getElementById("cacheStatus"),
+        httpStatus: document.getElementById("httpStatus"),
+        responseTime: document.getElementById("responseTime"),
+        rtt: document.getElementById("rtt"),
+        edgeLatency: document.getElementById("edgeLatency"),
+        edgeName: document.getElementById("edgeName"),
+        age: document.getElementById("age"),
+        contentLength: document.getElementById("contentLength"),
+        lastRequest: document.getElementById("lastRequest"),
+      };
+
+      function headerOrDefault(headers, candidates) {
+        for (const name of candidates) {
+          const value = headers.get(name);
+          if (value) return value;
+        }
+        return "-";
+      }
+
+      function setLoading(loading) {
+        ui.fetchBtn.disabled = loading;
+        ui.refetchBtn.disabled = loading;
+      }
+
+      async function runFetch({ forceRefetch = false } = {}) {
+        setLoading(true);
+        const url = forceRefetch
+          ? `${IMAGE_PATH}?refetch=${Date.now()}`
+          : IMAGE_PATH;
+
+        const started = performance.now();
+        try {
+          const resp = await fetch(url, { cache: "no-store" });
+          const blob = await resp.blob();
+          const duration = performance.now() - started;
+          const network = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
+          const cacheStatus = headerOrDefault(resp.headers, ["x-cache", "cf-cache-status"]);
+          const edgeLatency = headerOrDefault(resp.headers, ["server-timing", "x-edge-latency", "x-envoy-upstream-service-time"]);
+          const edgeName = headerOrDefault(resp.headers, ["x-edge", "x-served-by", "x-amz-cf-pop", "via", "server"]);
+          const age = headerOrDefault(resp.headers, ["age"]);
+          const contentLength = resp.headers.get("content-length") || blob.size.toString();
+
+          ui.cacheStatus.textContent = cacheStatus;
+          ui.httpStatus.textContent = `${resp.status} ${resp.statusText}`;
+          ui.responseTime.textContent = `${duration.toFixed(2)} ms`;
+          ui.rtt.textContent = network && typeof network.rtt === "number" ? `${network.rtt} ms` : "Unavailable";
+          ui.edgeLatency.textContent = edgeLatency;
+          ui.edgeName.textContent = edgeName;
+          ui.age.textContent = age;
+          ui.contentLength.textContent = `${contentLength} bytes`;
+          ui.lastRequest.textContent = `Last request: ${new Date().toLocaleTimeString()} (${url})`;
+
+          const objectUrl = URL.createObjectURL(blob);
+          ui.heroImage.src = objectUrl;
+          ui.heroImage.onload = () => URL.revokeObjectURL(objectUrl);
+        } catch (err) {
+          ui.lastRequest.textContent = `Request failed: ${err instanceof Error ? err.message : String(err)}`;
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      ui.fetchBtn.addEventListener("click", () => runFetch({ forceRefetch: false }));
+      ui.refetchBtn.addEventListener("click", () => runFetch({ forceRefetch: true }));
+    </script>
   </body>
 </html>

@@ -133,6 +133,29 @@ resource "aws_instance" "dns" {
           systemctl enable amazon-ssm-agent
           systemctl restart amazon-ssm-agent
 
+          mkdir -p /opt/geoip
+          if [ -n "${var.geoip_account_id}" ] && [ -n "${var.geoip_license_key}" ]; then
+            # MaxMind direct download permalink; curl -L follows the R2 redirect host.
+            retry curl -fsSL -L \
+              -u "${var.geoip_account_id}:${var.geoip_license_key}" \
+              "https://download.maxmind.com/geoip/databases/${var.geoip_edition_id}/download?suffix=tar.gz" \
+              -o /tmp/geoip-download.bin
+          elif [ -n "${var.geoip_db_url}" ]; then
+            retry curl -fsSL -L "${var.geoip_db_url}" -o /tmp/geoip-download.bin
+          fi
+          if [ -s /tmp/geoip-download.bin ]; then
+            if tar -tzf /tmp/geoip-download.bin >/dev/null 2>&1; then
+              tar -xzf /tmp/geoip-download.bin -C /tmp
+              MMDB_SRC=$(ls /tmp/GeoLite2-City_*/GeoLite2-City.mmdb 2>/dev/null | head -n1 || true)
+              if [ -n "$MMDB_SRC" ]; then
+                cp "$MMDB_SRC" /opt/geoip/GeoLite2-City.mmdb
+              fi
+            else
+              cp /tmp/geoip-download.bin /opt/geoip/GeoLite2-City.mmdb
+            fi
+            chmod 0644 /opt/geoip/GeoLite2-City.mmdb || true
+          fi
+
           TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
@@ -142,9 +165,11 @@ resource "aws_instance" "dns" {
             --cap-add NET_BIND_SERVICE \
             --user 0:0 \
             --network host \
+            -v /opt/geoip:/data/geoip:ro \
             -e DNS_LISTEN_ADDR=:53 \
             -e DNS_SELF_IP=$PUBLIC_IP \
             -e DNS_NS_HOSTS='${join(",", var.ns_hosts)}' \
+            -e DNS_GEOIP_DB_PATH=/data/geoip/GeoLite2-City.mmdb \
             -e DNS_AUTHORITATIVE_DOMAIN=${var.authoritative_domain} \
             -e DNS_ORIGIN_IP=${var.origin_ip} \
             -e DNS_DEFAULT_EDGE=${var.default_edge} \
