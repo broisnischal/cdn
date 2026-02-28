@@ -33,6 +33,11 @@ docker-build-images tag=tag:
   docker build -t {{registry}}/{{owner}}/go-cdn-origin:{{tag}} ./origin
   docker build -t {{registry}}/{{owner}}/go-cdn-dns:{{tag}} ./dns
 
+docker-build-images-fresh tag=tag:
+  docker build --pull --no-cache -t {{registry}}/{{owner}}/go-cdn:{{tag}} ./cdn
+  docker build --pull --no-cache -t {{registry}}/{{owner}}/go-cdn-origin:{{tag}} ./origin
+  docker build --pull --no-cache -t {{registry}}/{{owner}}/go-cdn-dns:{{tag}} ./dns
+
 ghcr-login:
   test -n "${GHCR_TOKEN:-}" || (echo "GHCR_TOKEN is required" && exit 1)
   echo "${GHCR_TOKEN}" | docker login {{registry}} -u {{owner}} --password-stdin
@@ -46,6 +51,16 @@ publish-images tag=tag:
   just ghcr-login
   just docker-build-images {{tag}}
   just docker-push-images {{tag}}
+
+publish-images-fresh tag=tag:
+  just ghcr-login
+  just docker-build-images-fresh {{tag}}
+  just docker-push-images {{tag}}
+
+publish-origin tag=tag:
+  just ghcr-login
+  docker build -t {{registry}}/{{owner}}/go-cdn-origin:{{tag}} ./origin
+  docker push {{registry}}/{{owner}}/go-cdn-origin:{{tag}}
 
 up:
   docker compose -f compose.yaml up -d --build
