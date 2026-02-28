@@ -86,35 +86,57 @@ resource "aws_instance" "edge" {
   instance_type          = var.instance_type
   subnet_id              = data.aws_subnets.default.ids[0]
   vpc_security_group_ids = [aws_security_group.edge.id]
-  iam_instance_profile   = aws_iam_instance_profile.profile.name
+  iam_instance_profile        = aws_iam_instance_profile.profile.name
+  user_data_replace_on_change = true
 
   metadata_options {
     http_tokens = "required"
   }
 
   root_block_device {
-    encrypted = true
+    encrypted   = true
     volume_size = 20
     volume_type = "gp3"
   }
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-    dnf -y update
-    dnf -y install docker
-    systemctl enable docker
-    systemctl start docker
-    docker run -d --name edge --restart unless-stopped \
-      -p 80:8080 \
-      -e EDGE_LISTEN_ADDR=:8080 \
-      -e ORIGIN_URL=${var.origin_url} \
-      -e EDGE_MAX_MEMORY_BYTES=268435456 \
-      -e EDGE_EVICTION_POLICY=lru \
-      -e EDGE_DISK_CACHE_DIR=/cache \
-      -e EDGE_DISK_CACHE_MAX_BYTES=4294967296 \
-      -v /var/lib/gocdn-cache:/cache \
-      ${var.container_image}
+    #cloud-config
+    runcmd:
+      - |
+          set -euxo pipefail
+          retry() {
+            local n=0
+            local max=5
+            local delay=5
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge "$max" ]; then
+                echo "command failed after $n attempts: $*"
+                return 1
+              fi
+              sleep "$delay"
+            done
+          }
+
+          retry dnf -y update
+          retry dnf -y install docker amazon-ssm-agent
+          systemctl enable docker
+          systemctl start docker
+          systemctl enable amazon-ssm-agent
+          systemctl restart amazon-ssm-agent
+
+          docker rm -f edge || true
+          retry docker pull ${var.container_image}
+          docker run -d --name edge --restart unless-stopped \
+            -p 80:8080 \
+            -e EDGE_LISTEN_ADDR=:8080 \
+            -e ORIGIN_URL=${var.origin_url} \
+            -e EDGE_MAX_MEMORY_BYTES=268435456 \
+            -e EDGE_EVICTION_POLICY=lru \
+            -e EDGE_DISK_CACHE_DIR=/cache \
+            -e EDGE_DISK_CACHE_MAX_BYTES=4294967296 \
+            -v /var/lib/gocdn-cache:/cache \
+            ${var.container_image}
   EOF
 
   tags = {

@@ -79,28 +79,50 @@ resource "aws_instance" "origin" {
   instance_type          = var.instance_type
   subnet_id              = data.aws_subnets.default.ids[0]
   vpc_security_group_ids = [aws_security_group.origin.id]
-  iam_instance_profile   = aws_iam_instance_profile.profile.name
+  iam_instance_profile        = aws_iam_instance_profile.profile.name
+  user_data_replace_on_change = true
 
   metadata_options {
     http_tokens = "required"
   }
 
   root_block_device {
-    encrypted = true
+    encrypted   = true
     volume_size = 20
     volume_type = "gp3"
   }
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-    dnf -y update
-    dnf -y install docker
-    systemctl enable docker
-    systemctl start docker
-    docker run -d --name origin --restart unless-stopped \
-      -p 8081:8081 \
-      ${var.container_image}
+    #cloud-config
+    runcmd:
+      - |
+          set -euxo pipefail
+          retry() {
+            local n=0
+            local max=5
+            local delay=5
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge "$max" ]; then
+                echo "command failed after $n attempts: $*"
+                return 1
+              fi
+              sleep "$delay"
+            done
+          }
+
+          retry dnf -y update
+          retry dnf -y install docker amazon-ssm-agent
+          systemctl enable docker
+          systemctl start docker
+          systemctl enable amazon-ssm-agent
+          systemctl restart amazon-ssm-agent
+
+          docker rm -f origin || true
+          retry docker pull ${var.container_image}
+          docker run -d --name origin --restart unless-stopped \
+            -p 8081:8081 \
+            ${var.container_image}
   EOF
 
   tags = {

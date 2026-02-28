@@ -90,11 +90,12 @@ locals {
 }
 
 resource "aws_instance" "dns" {
-  ami                    = data.aws_ami.al2023.id
-  instance_type          = var.instance_type
-  subnet_id              = data.aws_subnets.default.ids[0]
-  vpc_security_group_ids = [aws_security_group.dns.id]
-  iam_instance_profile   = aws_iam_instance_profile.profile.name
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = var.instance_type
+  subnet_id                   = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids      = [aws_security_group.dns.id]
+  iam_instance_profile        = aws_iam_instance_profile.profile.name
+  user_data_replace_on_change = true
 
   metadata_options {
     http_tokens = "required"
@@ -107,25 +108,49 @@ resource "aws_instance" "dns" {
   }
 
   user_data = <<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-    dnf -y update
-    dnf -y install docker
-    systemctl enable docker
-    systemctl start docker
-    TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-    PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
-    docker run -d --name authoritative-dns --restart unless-stopped \
-      --network host \
-      -e DNS_LISTEN_ADDR=:53 \
-      -e DNS_SELF_IP=$PUBLIC_IP \
-      -e DNS_NS_HOSTS='${join(",", var.ns_hosts)}' \
-      -e DNS_AUTHORITATIVE_DOMAIN=${var.authoritative_domain} \
-      -e DNS_ORIGIN_IP=${var.origin_ip} \
-      -e DNS_DEFAULT_EDGE=${var.default_edge} \
-      -e DNS_EDGE_SERVERS='${local.edge_servers}' \
-      -e DNS_GEO_CIDR_RULES='${join(",", var.geo_cidr_rules)}' \
-      ${var.container_image}
+    #cloud-config
+    runcmd:
+      - |
+          set -euxo pipefail
+          retry() {
+            local n=0
+            local max=5
+            local delay=5
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge "$max" ]; then
+                echo "command failed after $n attempts: $*"
+                return 1
+              fi
+              sleep "$delay"
+            done
+          }
+
+          retry dnf -y update
+          retry dnf -y install docker amazon-ssm-agent
+          systemctl enable docker
+          systemctl start docker
+          systemctl enable amazon-ssm-agent
+          systemctl restart amazon-ssm-agent
+
+          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          PUBLIC_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+          docker rm -f authoritative-dns || true
+          retry docker pull ${var.container_image}
+          docker run -d --name authoritative-dns --restart unless-stopped \
+            --cap-add NET_BIND_SERVICE \
+            --user 0:0 \
+            --network host \
+            -e DNS_LISTEN_ADDR=:53 \
+            -e DNS_SELF_IP=$PUBLIC_IP \
+            -e DNS_NS_HOSTS='${join(",", var.ns_hosts)}' \
+            -e DNS_AUTHORITATIVE_DOMAIN=${var.authoritative_domain} \
+            -e DNS_ORIGIN_IP=${var.origin_ip} \
+            -e DNS_DEFAULT_EDGE=${var.default_edge} \
+            -e DNS_EDGE_SERVERS='${local.edge_servers}' \
+            -e DNS_GEO_CIDR_RULES='${join(",", var.geo_cidr_rules)}' \
+            ${var.container_image}
   EOF
 
   tags = {
