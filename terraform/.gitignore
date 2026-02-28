@@ -1,6 +1,5 @@
 # Terraform working/state files
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 crash.log

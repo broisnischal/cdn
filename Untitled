@@ -1,0 +1,12 @@
+terraform/
+providers.tf
+main.tf
+variables.tf
+outputs.tf
+modules/
+edge-node/
+origin-node/
+dns/
+envs/
+dev.tfvars
+prod.tfvars
