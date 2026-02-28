@@ -1,0 +1,14 @@
+# Terraform working/state files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Optional local variable files
+terraform.tfvars
+*.auto.tfvars
